@@ -11,6 +11,12 @@ current evidence and product requirements, superseding earlier provisional
 results; the original observations remain below as history. No production
 cutover or extra Cloudflare rule was performed.
 
+The later authenticated, same-source Vercel preview comparison is recorded in
+the final section: blog mobile medians were 2.578 s on Vercel and 2.735 s on
+Compute/Cloudflare, with overlapping run ranges. The large earlier advantage
+over the live production homepage includes application changes that benefit
+both hosts; it must not be interpreted as a hosting-only advantage.
+
 Recorded on 12 October 2026. Tested with Composer and the Prisma Cloud target
 0.29.1, Prisma CLI 8.0.0-rc.22, Next.js 16.3.4, pnpm 12.3.4, and Bun 1.4.3.
 The target constraints are 1 GB memory and 1 GB files per Compute service.
@@ -1910,3 +1916,109 @@ and some network paths fluctuate. A practical parity gate needs repeated
 cold/warm/expired/campaign/navigation tests across ASNs and field p75 LCP/INP/CLS,
 in addition to these lab samples. No private content was made cacheable, no
 analytics/protection was disabled, and no production cutover was performed.
+
+## Same-source Vercel preview verification — 25 October
+
+The user supplied the signed-in [site branch preview](https://site-git-codex-web-composer-prisma.vercel.app/).
+Tests used that existing Chrome Work window through native UI automation,
+including the built-in Lighthouse panel. Authentication and deployment protection
+were retained. GitHub deployment metadata identifies Vercel source
+`a86036a22e491dabe6c4cf5ae32baf959dfc8507`; its application code is identical to
+Compute's deployed `40a69269a70e74ff3d8223f3302cf285530d4e88` (the intervening
+commit changes findings only). The six Compute live version IDs match the
+previous verification after this comparison. No application code changed here.
+
+Use each zone's exact deployment, rather than assuming the homepage preview's
+zone forwards identify a particular docs/blog build:
+
+| Project | GitHub deployment | Exact preview |
+| --- | --- | --- |
+| Site | 7311195285 | https://site-fih9qcqex-prisma.vercel.app/ |
+| Docs | 7311202792 | https://docs-2rxj3n7nd-prisma.vercel.app/docs/composer |
+| Blog | 7311196051 | https://blog-e6e8ozd6z-prisma.vercel.app/blog |
+
+The site's observed deployment ID `72rq4JFeS5f1rRysc2aHVZgAzjNu` also matches
+the commit's Vercel status, verifying the user-provided branch alias at measurement
+time. The two other exact URLs were read from successful GitHub deployment statuses.
+
+### Method and performance
+
+Fourteen selected audits: twelve mobile (blog three per host, other pages one
+per host) and two desktop docs diagnostics. Chrome 155 / Lighthouse UI 13.4.1,
+same signed-in Work profile, serial audits without concurrent local builds/tests.
+Network **Disable cache** was enabled to fetch assets over the network; Lighthouse
+**Clear storage** was disabled to preserve the authenticated session. These are
+authenticated network-reload diagnostics, not anonymous first-visit field data.
+An initial browser-cache pilot transferred only 66 KB and gave 0.873 s homepage
+LCP; it is retained locally and excluded from the comparison.
+
+Mobile uses the UI's applied DevTools Slow 4G preset: request latency 562.5 ms,
+download 1,474.56 Kbps, upload 675 Kbps, CPU ×4, 412 × 823. This is a different
+profile and Lighthouse version from the earlier CLI measurements, which applied
+150 ms / 1,600 / 750 Kbps. Do not compare the two batches as before/after timings.
+
+| Page | Vercel preview LCP | Compute + Cloudflare LCP | Samples per host |
+| --- | ---: | ---: | ---: |
+| Homepage | 2.759 s | 2.944 s | 1 |
+| Docs Composer | 3.003 s | 2.896 s | 1 |
+| Blog index | 2.578 s | 2.735 s | 3, median |
+| Blog article | 2.539 s | 2.674 s | 1 |
+
+Blog ranges overlap: Vercel 2.308–2.667 s, Compute 2.459–2.825 s. Median blog
+TBT is 745 / 665 ms (Vercel / Compute), and CLS is 0.001853 on both. The small
+LCP differences do not establish a general hosting winner. Application startup
+work and third-party integrations remain part of the measured result.
+
+Sanitized document HAR entries matched to each audit show Vercel HITs but
+Cloudflare EXPIRED on all six mobile documents. Both sent request no-cache as
+part of the diagnostic. This is the current end-to-end policy comparison, not a
+controlled HIT-versus-HIT benchmark; applied mobile throttling also obscures
+some origin-latency differences. The cache-expiry/key-coverage gap is still
+present. Do not derive unthrottled network latency by subtracting the configured
+throttle from these request times.
+
+The matched desktop docs diagnostics were HIT on both: LCP **0.289 / 0.280 s**
+(Vercel / Compute), TBT 21 / 18 ms, CLS 0.000036 / 0.000249. The UI desktop preset
+used CPU ×1 and no actual network shaping (request latency/download/upload were
+zero in DevTools mode). These fast-connection samples verify the corrected font
+path and demonstrate fast cached delivery on both; they do not replace the
+earlier 40 ms / 10 Mbps desktop tests or prove that font swapping can never shift.
+
+All fourteen selected audits completed without runtime errors or first-party
+CSS/JS/image/font HTTP failures. Docs monitoring returns 403 on both hosts.
+Compute's custom hostname still receives Font Awesome kit 403 and Promptwatch
+ingest 404; those succeeded in these Vercel samples. CookieYes also reports its
+registered-domain mismatch on the Vercel preview. These external integration
+differences limit an isolated hosting comparison, and are not successful
+production-consent/telemetry tests. Their scripts and protections were retained.
+
+### Vercel behavior checks and merge implications
+
+- Docs loads one Latin Inter subset and one canonical code-font URL, alongside
+  Sora, without duplicate font downloads. Desktop/mobile text and code render.
+- Ask AI shows its loading state on first open, then initializes the SDK and
+  invisible CAPTCHA. Initial docs audits contain no CAPTCHA requests. Desktop
+  Escape closes it visibly, the keyboard shortcut reopens it, and an unsent
+  draft survives close/reopen plus Composer → Compute → Back navigation. The
+  test draft was cleared without submission.
+- The mobile drawer opens/closes and its layout was visually checked at
+  412 × 823. No actual AI question or CAPTCHA challenge was submitted/solved.
+- Pricing cards/grain and the homepage closing card were visually checked.
+  Initial homepage audits do not request the closing video; the browser's
+  Media log shows the Vercel preview video URL serving 206 range responses
+  during inspection. No missing artwork was observed.
+
+The changed Vercel behavior checks found no new release blocker. A real Ask AI
+answer remains a useful manual check at the exact docs preview above. Normal
+required PR review still applies. This does not certify the separate Compute
+cache/release design gaps as solved or authorize a production cutover.
+
+The browser was restored to normal caching, its original Lighthouse settings,
+responsive dimensions/device mode, right dock and Console panel; DevTools was
+closed and the supplied preview left at the homepage. Raw reports, sanitized
+document HARs, cache-state matches, deployment identity, service-version snapshot,
+QA notes and machine-readable results remain locally in
+`output/playwright/performance-2026-10-25/signed-in-preview/`. The raw authenticated
+browser artifacts are not committed. This section records the public aggregate
+evidence and supersedes any implication that the production comparison alone
+measured a Compute hosting advantage.
