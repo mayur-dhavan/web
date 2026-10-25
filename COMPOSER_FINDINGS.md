@@ -2022,3 +2022,26 @@ QA notes and machine-readable results remain locally in
 browser artifacts are not committed. This section records the public aggregate
 evidence and supersedes any implication that the production comparison alone
 measured a Compute hosting advantage.
+
+### Follow-up: user-submitted Ask AI question
+
+The user manually submitted a question on the exact docs preview and confirmed
+that the chat UI loaded correctly. Inspection of the retained Chrome Network
+entry shows `POST https://proxy.kapa.ai/proxy/query/v2/chat/stream/` returning
+HTTP 200 with `Content-Type: application/json`, but without
+`Access-Control-Allow-Origin`. Chrome reports `MissingAllowOriginHeader` and
+cannot expose the response body to the SDK.
+
+Read-only OPTIONS probes on the same endpoint returned 200 and allowed the
+production, exact preview and custom-domain origins, including the SDK's header
+names. This is not evidence of a failed preflight. A per-integration domain
+policy or upstream error response is plausible; the actual cause is unconfirmed
+without the service's configuration/logs or readable response body. The Kapa
+integration ID and default direct API endpoint match main. Kapa's
+[configuration FAQ](https://docs.kapa.ai/integrations/website-widget/faq#how-do-i-fix-configuration-issue-detected-error)
+also identifies CORS as a possible integration configuration issue.
+
+Record the UI behavior as passed and actual answer generation as unverified.
+Do not count this as a successful end-to-end answer or assume an allowlist change
+alone fixes it. No query was replayed, CAPTCHA token reused, protection relaxed,
+or external integration configuration changed during diagnosis.
